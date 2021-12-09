@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.17.1
+# v0.16.1
 
 using Markdown
 using InteractiveUtils
@@ -7,9 +7,8 @@ using InteractiveUtils
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
     quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : missing
         el
     end
 end
@@ -44,9 +43,6 @@ md"# Transit Duration Analysis of Kepler Sample"
 # ╔═╡ cb9f36fe-8bae-4e54-ae9c-d2fdc466c425
 md"## Full Sample"
 
-# ╔═╡ dc9d19bc-cdcb-4a19-bbda-71203b0832a3
-md"> ⚠ Some thing is fishy here.  Need to update stellar densities in input file!"
-
 # ╔═╡ f8fa6349-04be-4f6c-9465-85208dfc198d
 md"## Checking thresholds choices"
 
@@ -73,18 +69,11 @@ md"### Maximum Impact Parameter"
 
 # ╔═╡ 4276feec-2e6f-4a89-89be-7a152a3833dc
 md"""
-Alternative Maximum b: $(@bind alt_max_b NumberField(0.0 : 0.01 :1, default=0.9))
+Alternative Maximum b: $(@bind alt_max_b NumberField(0.0 : 0.01 :1, default=0.9))    (0.0=> max b+σ_b^+ = 1-Rp/R⋆)"
 """
 
 # ╔═╡ dac4d650-c8b7-4a24-8420-a0ebc56dccca
 md"## Fitting Population to analytic models"
-
-# ╔═╡ da90b894-32da-4187-b1a1-6548bf5b5b12
-md"""
-> ⚠ Need to update stellar densities in input file!
->
-> Wait until fix issue with stellar densities before fitting a model!
-"""
 
 # ╔═╡ 561c5fee-e103-4de8-ab47-e11f32a2a9d0
 md"""
@@ -105,14 +94,17 @@ Minium SNR: $(@bind min_SNR NumberField(7.0:0.5:30, default= 15.0))
 # ╔═╡ d3b2e526-8838-460c-ad02-a6bde5c5ef4f
 md"Max b: $(@bind max_b NumberField(0:0.01:1.0, default=0.0) )   (0.0=> max b = 1-Rp/R⋆)"
 
-# ╔═╡ 7fe5f5af-2085-49ab-9a6c-990548ccb5f3
-
-
 # ╔═╡ 5af5ef4f-a8a4-48b8-8111-c30765cf0ac0
 md"## Comparing Subsets"
 
 # ╔═╡ ab590e37-4c5b-4609-876a-c09ee92985c8
 md"### Multiplicity"
+
+# ╔═╡ b97f75f9-5e15-45d9-9478-9eb415223f2a
+md"### Multiplicity, Only sub-Neptunes"
+
+# ╔═╡ 205c669d-d233-486e-94c2-e233832e3207
+md"### TTVs, Only sub-Neptunes"
 
 # ╔═╡ 9f930a87-597d-4997-9819-6a41acdd53bb
 md"### Planet Size"
@@ -121,7 +113,7 @@ md"### Planet Size"
 md"### Orbital Period"
 
 # ╔═╡ 4cf1d6c9-ff78-4056-be09-2279ccb3b54c
-num_P_bins = 4
+num_P_bins = 5
 
 # ╔═╡ c859043d-d7ba-47cd-9035-319cdc200720
 md"### Host Star Temperature"
@@ -135,6 +127,12 @@ md"### Stellar Temperature"
 # ╔═╡ ff82c99c-b489-43a8-abc4-ceaf694aabf8
 md"### Singles vs Multis"
 
+# ╔═╡ 7578f32b-1f5f-4b78-a846-5e68632504fb
+md"#### Singles vs Multis, Sub-Neptunes w/ Minimum Period"
+
+# ╔═╡ b4ed3a71-8b6f-474b-9d6e-b9f48c24c6c9
+
+
 # ╔═╡ 639dfbeb-60e5-4f59-a3dc-81a0884f0ac4
 md"### Planet Size"
 
@@ -144,22 +142,20 @@ md"### Orbital Period"
 # ╔═╡ d498d791-9763-47e5-b5cc-3a41d930dbe7
 md"## Geneate Simulated τ Distributions"
 
-# ╔═╡ 893a58a5-f88b-4a59-bf21-c66b7e9404d4
-repeat([1,2,3],3)[rand(Bool,9)]
-
 # ╔═╡ 46749afb-7cdb-4956-b835-8623b7cd856a
 function calc_taus_assuming_e_rayleigh(df::DataFrame, σ::Real; obs_noise::Bool = false)
 	max_b::Union{Float64,Int64}
 	n = size(df,1)
 	b = rand(n).* (max_b>0 ? max_b : 1.0 .- df.RpRs )
-	e = rand.(truncated.(Rayleigh(σ),0.0,1.0.-3.0.*0.005.*df.rstar))
+	e = rand.(truncated.(Rayleigh(σ),0.0,0.99),n) #1.0.-3.0.*0.005.*df.rstar))
 	ω = 2π.*rand(n)
 	tau = sqrt.((1.0.+b).*(1.0.-b)).*sqrt.((1.0 .+ e).*(1.0 .- e))./(1.0 .+ e.*cos.((π/2).-ω))
 	if obs_noise 
 		sigma_rho_star = copy(df.rhostar_ep)
 		mask = rand(Bool,n)
 		sigma_rho_star[mask] .= df.rhostar_em[mask]
-		rho_star = rand.(TruncatedNormal.(df.rhostar,abs.(sigma_rho_star),0.0, Inf))
+		#rho_star = rand.(TruncatedNormal.(df.rhostar,abs.(sigma_rho_star),0.0, Inf))
+		rho_star = clamp.(df.rhostar .+ sigma_rho_star.*randn(n),0,Inf) 
 		P = df.TTVperiod .+ df.TTVperiod_e .* randn(n)
 		tau .*= (P./df.TTVperiod.*df.rhostar./rho_star).^(1//3)
 	end
@@ -215,11 +211,15 @@ TableOfContents(aside=true)
 # ╔═╡ 2704c820-d307-4acc-869a-e8670232ec38
 md"### Read data"
 
+# ╔═╡ f4c7e3a9-2e26-4da7-9e09-864fe9c26523
+
+
 # ╔═╡ 35d1e842-496b-11ec-2e35-17c2d536f22f
 begin
 	path = joinpath(homedir(),"Documents")
 	if !isdir(path) path = homedir() end
-	datafile = "koiprops_20211110.csv"
+	#datafile = "koiprops_20211110.csv"
+	datafile = "koiprops_20211202.csv"
 	if ! (filesize(joinpath(path,datafile)) >0)
 		download("https://www.dropbox.com/s/yberp4e3pbggvk1/koiprops_20211110.csv?dl=1", output=joinpath(path,datafile))
 	end
@@ -234,15 +234,6 @@ md"### Filter planet table"
 
 # ╔═╡ 591cebe7-9aa4-4617-9aee-c10c038a7002
 md"## Diagnosing problem with rhostar"
-
-# ╔═╡ b3447847-e7f2-4844-be44-01669a0f0e74
-names(df_all)
-
-# ╔═╡ 8f46b232-4978-4ea5-bade-d8446e37b8ff
-names(df_all)[14]
-
-# ╔═╡ 2f44dc3d-00f9-4fb9-b4af-e15eead627c2
-names(df_all)[65]
 
 # ╔═╡ 52ca81e0-fa57-4957-a91d-4b6919c3366e
 rhosol = 1.989e33/(4π*6.9634e10^3/3)
@@ -277,7 +268,8 @@ begin
 	if 7<=min_SNR<=30
 		df_pl_no_teffcut = df_pl_all |> 
 			@filter( _.SNR >= min_SNR  ) |>
-			@filter( _.b < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
+			@filter( _.SNR * sqrt(_.tdur_circ) >= min_SNR * sqrt(_.tduravg) ) |>
+			@filter( _.b + _.b_ep < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
 			DataFrame
 		make_plots = true
 	else
@@ -289,7 +281,13 @@ end;
 # ╔═╡ e4581234-6052-4ec4-b6d1-94d3c3c10a28
 begin
 	if (3200 <= min_teff <= 9300) && (3200 <= max_teff <= 9300)
-		df_pl = df_pl_no_teffcut |>	@filter( min_teff <= _.teff <= max_teff ) |> DataFrame
+		df_pl = df_pl_no_teffcut |>
+			@filter( min_teff <= _.teff <= max_teff ) |> 
+			DataFrame
+		df_pl_subN_minP = df_pl |> 
+			@filter( _.radius <= 4 ) |> 
+			#@filter( _.Per_lc >= 5 ) |> 
+			DataFrame
 		make_kraft_plot = true
 	else
 		make_kraft_plot = false
@@ -301,8 +299,11 @@ end;
 begin
 	h_pl = fit(Histogram, df_pl.tduravg, nbins=200)
 	#histogram(df_pl.tduravg, nbins=200)
-	plot(h_pl,color=1, label=:none)
+	plot(h_pl,color=1, alpha=0.5, label=:none)
 	plot!(h_pl.edges,maximum(h_pl.weights).*ecdf(df_pl.tduravg).(h_pl.edges), label=:none, color=1)
+	h_pl_subN_minP = fit(Histogram, df_pl_subN_minP.tduravg, nbins=200)
+	plot!(h_pl_subN_minP,color=2, label=:none)
+	plot!(h_pl_subN_minP.edges,maximum(h_pl.weights).*ecdf(df_pl_subN_minP.tduravg).(h_pl_subN_minP.edges), label=:none, color=2)
 	xlabel!("Transit Duration (hr)")
 	ylabel!("Count")
 end
@@ -311,6 +312,8 @@ end
 begin
 	tau_all = df_pl.tduravg./df_pl.tdur_circ
 	ntdur_all_cum = ecdf(tau_all)
+	tau_subN_minP = df_pl_subN_minP.tduravg./df_pl_subN_minP.tdur_circ
+	ntdur_subN_minP_cum = ecdf(tau_subN_minP )
 	x_plt = range(minimum(ntdur_all_cum), stop=maximum(ntdur_all_cum), length=200)
 end;
 
@@ -318,20 +321,36 @@ end;
 begin
 	h_tau_norm = fit(Histogram,tau_all, nbins=200)
 	plot(h_tau_norm, label=:none, color=1)
-	plot!(h_tau_norm.edges, maximum(h_tau_norm.weights).*ntdur_all_cum.(h_tau_norm.edges), label=:none, color=1)
+	plot!(h_tau_norm.edges, maximum(h_tau_norm.weights).*ntdur_all_cum.(h_tau_norm.edges), label=:none, color=:black)
 	xlabel!("Normalized Transit Duration")
 	ylabel!("Count")
 end
 
 # ╔═╡ 4c77a70d-c003-48eb-a683-359446950878
 begin
-	df_pl_alt_snr = df_pl_all |> 
+	df_pl_wbias = df_pl_all |> 
+			@filter( _.SNR >= min_SNR  ) |>
+			@filter( _.b + _.b_ep < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
+			DataFrame
+	df_pl_alt_snr_wbias = df_pl_all |> 
 			@filter( _.SNR >= alt_min_SNR  ) |>
-			@filter( _.b < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
+			@filter( _.b + _.b_ep < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
+			DataFrame
+	df_pl_alt_snr_wobias = df_pl_all |> 
+			@filter( _.SNR >= 7.1 ) |>
+			@filter( _.SNR * sqrt(_.tdur_circ) >= alt_min_SNR * sqrt(_.tduravg) ) |>
+			@filter( _.b + _.b_ep < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
+			DataFrame
+	df_pl_snr_wobias = df_pl_all |> 
+			@filter( _.SNR >= 7.1 ) |>
+			@filter( _.SNR * sqrt(_.tdur_circ) >= min_SNR * sqrt(_.tduravg) ) |>
+			@filter( _.b + _.b_ep < (max_b>0 ? max_b : 1.0 - _.RpRs )) |> 
 			DataFrame
 	plt_alt_snr = plot(legend=:bottomright)
-	plot!(plt_alt_snr,h_tau_norm.edges,ntdur_all_cum.(h_tau_norm.edges), label="min SNR="*string(min_SNR) )
-	plot!(plt_alt_snr,h_tau_norm.edges,ecdf(df_pl_alt_snr.tduravg./df_pl_alt_snr.tdur_circ).(h_tau_norm.edges), label="min SNR="*string(alt_min_SNR) )
+	plot!(plt_alt_snr,h_tau_norm.edges,ecdf(df_pl_alt_snr_wobias.tduravg./df_pl_alt_snr_wobias.tdur_circ).(h_tau_norm.edges), label="min SNR=max("*string(alt_min_SNR)* " τ^½,7.1)" )
+	plot!(plt_alt_snr,h_tau_norm.edges,ecdf(df_pl_snr_wobias.tduravg./df_pl_snr_wobias.tdur_circ).(h_tau_norm.edges), label="min SNR=max("*string(min_SNR) * " τ^½,7.1)" )
+	plot!(plt_alt_snr,h_tau_norm.edges,ecdf(df_pl_wbias.tduravg./df_pl_wbias.tdur_circ).(h_tau_norm.edges), label="min SNR="*string(min_SNR) )
+	plot!(plt_alt_snr,h_tau_norm.edges,ecdf(df_pl_alt_snr_wbias.tduravg./df_pl_alt_snr_wbias.tdur_circ).(h_tau_norm.edges), label="min SNR="*string(alt_min_SNR) )
 	xlabel!(plt_alt_snr,"Normalized Transit Duration")
 	ylabel!(plt_alt_snr,"Cumulative")
 	xlims!(plt_alt_snr,0,2)
@@ -341,28 +360,52 @@ end
 begin
 	df_pl_alt_maxb = df_pl_all |> 
 			@filter( _.SNR >= min_SNR  ) |>
-			@filter( _.b < (alt_max_b>0 ? alt_max_b : 1.0 - _.RpRs )) |> 
+			#@filter( _.SNR >= 7.1 ) |>
+			#@filter( _.SNR * sqrt(_.tdur_circ) >= alt_min_SNR * sqrt(_.tduravg) ) |>
+			@filter( _.b + _.b_ep < (alt_max_b>0 ? alt_max_b : 1.0 - _.RpRs )) |> 
 			DataFrame
 	plt_alt_maxb = plot(legend=:bottomright)
 	plot!(plt_alt_maxb,h_tau_norm.edges,ntdur_all_cum.(h_tau_norm.edges), label="max b="*string(max_b) )
-	plot!(plt_alt_maxb,h_tau_norm.edges,ecdf(df_pl_alt_maxb.tduravg./df_pl_alt_maxb.tdur_circ).(h_tau_norm.edges), label="max b SNR="*string(alt_max_b) )
+	plot!(plt_alt_maxb,h_tau_norm.edges,ecdf(df_pl_alt_maxb.tduravg./df_pl_alt_maxb.tdur_circ).(h_tau_norm.edges), label="max b ="*string(alt_max_b) )
 	xlabel!(plt_alt_maxb,"Normalized Transit Duration")
 	ylabel!(plt_alt_maxb,"Cumulative")
 	xlims!(plt_alt_maxb,0,2)
 end
 
+# ╔═╡ e2935390-9f3b-4313-b264-ef3ffe6a1909
+size(df_pl,1), size(df_pl_alt_snr_wobias,1)
+
 # ╔═╡ 56effba4-4537-4f1b-8225-9683668ca37a
 if make_plots
 	redraw
 	plt_rayleighs = plot(xlabel="τ", ylabel="Cumulative", legend=:topleft)
-	plot!(plt_rayleighs,(x_plt),ntdur_all_cum.(x_plt), label="Kepler", color=:lightgrey) 
-	plot!(plt_rayleighs,(x_plt.*rhosol^(1//3)),ntdur_all_cum.(x_plt), label="Scaled Kepler", color=:black) 
-	plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,e_for_rayleigh,obs_noise=sim_noise).(x_plt), label="R($e_for_rayleigh)", color=:cyan)
+	plot!(plt_rayleighs,(x_plt),ntdur_all_cum.(x_plt), label="Kepler", color=:grey) 
+	plot!(plt_rayleighs,(x_plt),ntdur_subN_minP_cum.(x_plt), label="Sub-Neptunes minP", color=:black) 
+	
+	#plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,e_for_rayleigh,obs_noise=sim_noise).(x_plt), label="R($e_for_rayleigh)", color=:cyan)
+	plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl_subN_minP,e_for_rayleigh,obs_noise=sim_noise).(x_plt), label="R($e_for_rayleigh)", color=:cyan)
 	#plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,e_lo_for_rayleigh,obs_noise=sim_noise).(x_plt), label="R($e_lo_for_rayleigh)", color=:red)
 	#plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,e_hi_for_rayleigh,obs_noise=sim_noise).(x_plt), label="R($e_hi_for_rayleigh)", color=:blue)
-	plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,[e_lo_for_rayleigh,e_hi_for_rayleigh],[1-frac_hi_e,frac_hi_e],obs_noise=sim_noise).(x_plt), label="Mixture Model", color=:red)
+	
+	#plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl,[e_lo_for_rayleigh,e_hi_for_rayleigh],[1-frac_hi_e,frac_hi_e],obs_noise=sim_noise).(x_plt), label="Mixture Model", color=:red)
+	plot!(plt_rayleighs,(x_plt),calc_taus_assuming_e_rayleigh(df_pl_subN_minP,[e_lo_for_rayleigh,e_hi_for_rayleigh],[1-frac_hi_e,frac_hi_e],obs_noise=sim_noise).(x_plt), label="Mixture Model", color=:red)
 	xlims!(plt_rayleighs,0.25,1.5)
 end
+
+# ╔═╡ 88003636-9962-4f69-ba79-72a301ec1cc1
+size(df_pl,1)
+
+# ╔═╡ c175d516-2f7f-468f-988f-3446c234d6ce
+sum(df_pl.TTVflag.>=100)
+
+# ╔═╡ 3d095839-c07d-4e99-8004-e599fe08ecda
+sum(mod.(df_pl.TTVflag,100).>=10)
+
+# ╔═╡ e1cdb2a2-48e2-4cfc-8271-ce564db8dec3
+sum(mod.(df_pl.TTVflag,10).>=7)
+
+# ╔═╡ 5248a65a-6b3d-4f39-805b-e8d08824c363
+sum(df_pl.TTVflag.>=8)
 
 # ╔═╡ 5eccb812-d7bb-4f9f-a7a0-6892d8eb46ac
 begin
@@ -385,6 +428,9 @@ begin
 	xlims!(plt_P_bins,0,2)
 end
 
+# ╔═╡ f3b236dd-4355-4d01-9a5a-b5166fe1df41
+size.(df_P_bins,1)
+
 # ╔═╡ 3013ec6b-3139-4fdd-aa69-fe4b45dfd9f8
 begin
 	ad_P_bins = KSampleADTest(Tuple(map(tb->df_P_bins[tb].tduravg./df_P_bins[tb].tdur_circ,1:length(df_P_bins)))... )
@@ -393,6 +439,14 @@ end
 # ╔═╡ f8cc2102-eeb2-4b4c-a8d0-ec5c206a7f42
 md"k-sample Anderson-Darling test:  p-value =  $(pvalue(ad_P_bins))"
 
+# ╔═╡ 90eec4d8-162f-4ff9-861f-8e7482f5b8e7
+begin
+	ad_P_bins_first4 = KSampleADTest(Tuple(map(tb->df_P_bins[tb].tduravg./df_P_bins[tb].tdur_circ,1:4))... )
+end
+
+# ╔═╡ d088009d-f0a5-416a-9fd7-bc25e620336b
+md"k-sample Anderson-Darling test:  p-value =  $(pvalue(ad_P_bins_first4))"
+
 # ╔═╡ 1a7dc30e-a793-435c-9c79-c96ad455bb11
 P_limits
 
@@ -400,7 +454,8 @@ P_limits
 begin
 	num_Rp_bins = 8
 	#rp_limits = quantile(df_pl.radius,range(0.0,stop=1.0,length=num_Rp_bins+1))
-	rp_limits = [0.0, 1.0, 1.6, 2.0, 2.5, 3.0, 6.0, 20.0]; num_Rp_bins = length(rp_limits)-1
+	#rp_limits = [0.0, 1.0, 1.6, 2.0, 2.5, 3.0, 4.0, 6.0, 10, 15, 20.0]; num_Rp_bins = length(rp_limits)-1
+	rp_limits = [0.0, 1.0, 1.6, 2.8, 4.0, 10, 20.0]; num_Rp_bins = length(rp_limits)-1
 	df_Rp_bins = Vector{DataFrame}(undef,num_Rp_bins)
 	for i in 1:num_Rp_bins
 		df_Rp_bins[i] = df_pl |> @filter( rp_limits[i] <= _.radius <= rp_limits[i+1] ) |> DataFrame
@@ -410,7 +465,7 @@ end;
 
 # ╔═╡ 95dfd011-b505-4c94-93f8-9968e5eb6cab
 begin
-	plt_Rp_bins = plot(legend=:bottomright,palette=:Paired_7)
+	plt_Rp_bins = plot(legend=:bottomright,palette=:Paired_6)
 	for i in 1:length(df_Rp_bins)
 		plot!(plt_Rp_bins,h_tau_norm.edges,ecdf(df_Rp_bins[i].tduravg./df_Rp_bins[i].tdur_circ).(h_tau_norm.edges), label=string(round(Int64,rp_limits[i]*10)/10) *" - " * string(round(Int64,rp_limits[i+1]*10)/10) * " R_⊕", color=i )
 	end
@@ -419,37 +474,24 @@ begin
 	xlims!(plt_Rp_bins,0,2)
 end
 
+# ╔═╡ 06757582-96bb-42ed-84f0-d53f67b0bb00
+size.(df_Rp_bins,1)
+
 # ╔═╡ bda80d86-3430-45ef-9006-d6b77b1758d8
 begin
 	ad_Rp_bins = KSampleADTest(Tuple(map(tb->df_Rp_bins[tb].tduravg./df_Rp_bins[tb].tdur_circ,1:length(df_Rp_bins)))... )
 end
 
 # ╔═╡ df6285f5-9e8a-4dee-bbd3-64f1915ed5ba
-md"k-sample Anderson-Darling test:  p-value =  $(pvalue(ad_Rp_bins))"
+md"k-sample Anderson-Darling test, all Rp bins:  p-value =  $(pvalue(ad_Rp_bins))"
 
-# ╔═╡ 0ac069bb-3e86-4648-964e-69c640538187
+# ╔═╡ 4d81732f-f21f-4a47-8678-b1b5e01e378e
 begin
-scatter(df_pl.tdur_circ,df_pl.tduravg,ms=1.0)
-plot!(df_pl.tdur_circ,df_pl.tdur_circ)
+	ad_Rp_bins_first4 = KSampleADTest(Tuple(map(tb->df_Rp_bins[tb].tduravg./df_Rp_bins[tb].tdur_circ,1:4))... )
 end
 
-# ╔═╡ ed49e14f-4b9c-42d2-8e55-2b3091fe4c14
-let
-	plt =plot(xscale=:log10)
-	scatter!(plt,df_pl.TTVperiod,log10.(df_pl.tduravg./df_pl.TTVperiod.^(1//3)),ms=1.0)
-	scatter!(plt,df_pl.TTVperiod,log.(df_pl.tdur_circ./df_pl.TTVperiod.^(1//3)), ms=1.4)
-end
-
-# ╔═╡ 9179cdfd-1f7a-476f-a535-bae6a2fc192f
-scatter(df_pl.rhostar.*rhosol./df_pl.rhostar_model,yerr=df_pl.rhostar_ep.*rhosol./df_pl.rhostar_model,ylims=(0,2),ms=1.0)
-
-# ╔═╡ 0c3d9129-c9be-4dc4-a1a0-1b8ec39ba16c
-let
-	plt =plot(xscale=:log10)
-	histogram!(plt,df_pl.tdur,alpha=0.5, nbins=400)
-	histogram!(plt,df_pl.tdur_circ./rhosol, alpha=0.5, nbins=400)
-	xlims!(0.2,10)
-end
+# ╔═╡ 94e3a1d3-efc5-4b15-9f53-e53caa0129f5
+md"k-sample Anderson-Darling test. first four Rp bins:  p-value = $(pvalue(ad_Rp_bins_first4))"
 
 # ╔═╡ cc173a8d-09a4-4ff0-a695-6eba16ade3b1
 begin
@@ -469,7 +511,7 @@ end;
 begin
 	plt_teff_bins = plot(legend=:bottomright,palette=:Paired_10)
 	for i in 1:length(df_teff_bins)
-		plot!(plt_teff_bins,h_tau_norm.edges,ecdf(df_teff_bins[i].tduravg./df_teff_bins[i].tdur_circ).(h_tau_norm.edges), label=string(round(Int64,teff_limits[i])) *" - " * string(round(Int64,teff_limits[i+1])), color=i )
+		plot!(plt_teff_bins,h_tau_norm.edges,ecdf(df_teff_bins[i].tduravg./df_teff_bins[i].tdur_circ).(h_tau_norm.edges), label=string(round(Int64,teff_limits[i])) *" - " * string(round(Int64,teff_limits[i+1])) * " (" * string(size(df_teff_bins[i],1)) * ")", color=i )
 	end
 	xlabel!(plt_teff_bins,"Normalized Transit Duration")
 	ylabel!(plt_teff_bins,"Cumulative")
@@ -507,21 +549,6 @@ begin
 	df_pl_himulti = df_pl |> @filter(_.num_pl>=3) |> DataFrame;
 end;
 
-# ╔═╡ a6074ab0-eacd-427b-971a-20ee9af02abb
-if make_plots
-	plt_multis = plot(xlabel="Normalized Transit Duration", ylabel="Cumulative", legend=:topleft)
-	plot!(plt_multis,x_plt,ntdur_all_cum.(x_plt), label="All") 
-		
-	ntdur_single_cum = ecdf(df_pl_single.tduravg./df_pl_single.tdur_circ)
-	plot!(plt_multis,x_plt, ntdur_single_cum.(x_plt), label="Singles")
-	ntdur_double_cum = ecdf(df_pl_double.tduravg./df_pl_double.tdur_circ)
-	plot!(plt_multis,x_plt, ntdur_double_cum.(x_plt), label="Doubles")
-	ntdur_himulti_cum = ecdf(df_pl_himulti.tduravg./df_pl_himulti.tdur_circ)
-	plot!(plt_multis,x_plt, ntdur_himulti_cum.(x_plt), label="3+")
-	#title!("Grouped by Multiplicity")
-	xlims!(0,2)
-end
-
 # ╔═╡ 18dbba04-1be6-4a59-9d11-c2c95982897b
 ks_single_multi = ApproximateTwoSampleKSTest(df_pl_single.tduravg./df_pl_single.tdur_circ, df_pl_multi.tduravg./df_pl_multi.tdur_circ )
 
@@ -550,6 +577,106 @@ ad_multi_3way = KSampleADTest(df_pl_himulti.tduravg./df_pl_himulti.tdur_circ, df
 
 # ╔═╡ a6ec4534-fada-4210-a780-2e124c4b4595
 md"k-sample Anderson-Darling test:  p-value =  $(pvalue(ad_multi_3way))"
+
+# ╔═╡ caa510c4-45e4-4a47-bc07-554c4c596e53
+begin
+	df_pl_single_subN_minP = df_pl_subN_minP |> @filter(_.num_pl==1) |> DataFrame;
+	df_pl_double_subN_minP = df_pl_subN_minP |> @filter(_.num_pl==2) |> DataFrame;
+	df_pl_multi_subN_minP = df_pl_subN_minP |> @filter(_.num_pl>=2) |> DataFrame;
+	df_pl_himulti_subN_minP = df_pl_subN_minP |> @filter(_.num_pl>=3) |> DataFrame;
+end;
+
+
+# ╔═╡ 87288452-cb57-4459-a6e0-bcd1656292c8
+ks_single_multi_subN_minP = ApproximateTwoSampleKSTest(df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ, df_pl_multi_subN_minP.tduravg./df_pl_multi_subN_minP.tdur_circ )
+
+# ╔═╡ 289c5efb-a74d-4d8b-9a73-84541768a841
+ad_single_multi_subN_minP = KSampleADTest(df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ, df_pl_multi_subN_minP.tduravg./df_pl_multi_subN_minP.tdur_circ )
+
+# ╔═╡ 3e5f8730-08e0-4c9b-958d-71304e2f62f7
+ks_single_double_subN_minP = ApproximateTwoSampleKSTest(df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ, df_pl_double_subN_minP.tduravg./df_pl_double_subN_minP.tdur_circ )
+
+# ╔═╡ 527d4978-7292-497b-bdb6-8591e4546f1a
+ad_single_double_subN_minP = KSampleADTest(df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ, df_pl_double_subN_minP.tduravg./df_pl_double_subN_minP.tdur_circ )
+
+# ╔═╡ 0d820b6d-65fd-431e-a4da-4d708630a06f
+ks_multi_himulti_subN_minP = ApproximateTwoSampleKSTest(df_pl_himulti_subN_minP.tduravg./df_pl_himulti_subN_minP.tdur_circ, df_pl_multi_subN_minP.tduravg./df_pl_multi_subN_minP.tdur_circ )
+
+# ╔═╡ ab0abdfb-13f7-4126-8c1c-f0b36182a89e
+ad_multi_himulti_subN_minP = KSampleADTest(df_pl_himulti_subN_minP.tduravg./df_pl_himulti_subN_minP.tdur_circ, df_pl_multi_subN_minP.tduravg./df_pl_multi_subN_minP.tdur_circ )
+
+# ╔═╡ d47a6e1e-f37a-45ef-94e6-588ad7294109
+(;p_KS_1m=pvalue(ks_single_multi_subN_minP), p_AD_1m = pvalue(ad_single_multi_subN_minP),
+	p_KS_12=pvalue(ks_single_double_subN_minP),p_AD_12 = pvalue(ad_single_double_subN_minP), 
+	p_KS_23=pvalue(ks_multi_himulti_subN_minP),p_AD_23 = pvalue(ad_multi_himulti_subN_minP))
+
+# ╔═╡ bbffeaa4-6b1b-4ae3-85bc-ee8b6a47e000
+ad_multi_3way_subN_minP = KSampleADTest(df_pl_himulti_subN_minP.tduravg./df_pl_himulti_subN_minP.tdur_circ, df_pl_double_subN_minP.tduravg./df_pl_double_subN_minP.tdur_circ, df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ )
+
+# ╔═╡ 585b5544-b088-4b8d-aa7f-6da2157fead5
+begin
+	df_ttvs = df_pl_subN_minP |> @filter(_.TTVflag>=100) |> DataFrame
+	df_no_ttvs = df_pl_subN_minP |> @filter(_.TTVflag< 7) |> DataFrame
+	df_ttvs_subN_minP = df_pl_subN_minP |> @filter(_.TTVflag>=100) |> DataFrame
+	df_no_ttvs_subN_minP = df_pl_subN_minP |> @filter(_.TTVflag<7) |> DataFrame
+	#df_ttvs = df_pl |> @filter(mod(_.TTVflag,100)-mod(_.TTVflag,10)==10) |> DataFrame
+	#df_ttvs_subN_minP = df_pl_subN_minP |> @filter(mod(_.TTVflag,100)-mod(_.TTVflag,10)==10) |> DataFrame
+
+end;
+
+# ╔═╡ a6074ab0-eacd-427b-971a-20ee9af02abb
+if make_plots
+	plt_multis = plot(xlabel="Normalized Transit Duration", ylabel="Cumulative", legend=:topleft)
+	#plot!(plt_multis,x_plt,ntdur_all_cum.(x_plt), label="All") 
+		
+	ntdur_single_cum = ecdf(df_pl_single.tduravg./df_pl_single.tdur_circ)
+	plot!(plt_multis,x_plt, ntdur_single_cum.(x_plt), label="Singles")
+	ntdur_double_cum = ecdf(df_pl_double.tduravg./df_pl_double.tdur_circ)
+	plot!(plt_multis,x_plt, ntdur_double_cum.(x_plt), label="Doubles")
+	ntdur_himulti_cum = ecdf(df_pl_himulti.tduravg./df_pl_himulti.tdur_circ)
+	plot!(plt_multis,x_plt, ntdur_himulti_cum.(x_plt), label="3+")
+	ntdur_ttv_cum = ecdf(df_ttvs.tduravg./df_ttvs.tdur_circ)
+	plot!(plt_multis,x_plt, ntdur_ttv_cum.(x_plt), label="TTVs")
+	#title!("Grouped by Multiplicity")
+	xlims!(0,2)
+end
+
+# ╔═╡ 6da98b4f-b3cf-4af8-92df-4aa8c158be42
+if make_plots
+	plt_multis_sNmP = plot(xlabel="Normalized Transit Duration", ylabel="Cumulative", legend=:topleft)
+	#plot!(plt_multis_sNmP,x_plt,ntdur_all_cum.(x_plt), label="All") 
+		
+	ntdur_single_sNmP_cum = ecdf(df_pl_single_subN_minP.tduravg./df_pl_single_subN_minP.tdur_circ)
+	plot!(plt_multis_sNmP,x_plt, ntdur_single_sNmP_cum.(x_plt), label="Singles")
+	ntdur_double_sNmP_cum = ecdf(df_pl_double_subN_minP.tduravg./df_pl_double_subN_minP.tdur_circ)
+	plot!(plt_multis_sNmP,x_plt, ntdur_double_sNmP_cum.(x_plt), label="Doubles")
+	ntdur_himulti_sNmP_cum = ecdf(df_pl_himulti_subN_minP.tduravg./df_pl_himulti_subN_minP.tdur_circ)
+	plot!(plt_multis_sNmP,x_plt, ntdur_himulti_sNmP_cum.(x_plt), label="3+")
+	ntdur_ttv_sNmP_cum = ecdf(df_ttvs_subN_minP.tduravg./df_ttvs_subN_minP.tdur_circ)
+	plot!(plt_multis_sNmP,x_plt, ntdur_ttv_sNmP_cum.(x_plt), label="TTVs")
+
+	#title!("Grouped by Multiplicity")
+	xlims!(0,2)
+end
+
+# ╔═╡ 6950f3e7-ebff-48e5-980f-14939fa50c8f
+if make_plots
+	plt_ttvs = plot(xlabel="Normalized Transit Duration", ylabel="Cumulative", legend=:topleft)
+	#plot!(plt_multis,x_plt,ntdur_all_cum.(x_plt), label="All") 
+		
+	ntdur_no_ttv_cum = ecdf(df_no_ttvs.tduravg./df_no_ttvs.tdur_circ)
+	plot!(plt_ttvs,x_plt, ntdur_no_ttv_cum.(x_plt), label="No TTVs")
+	ntdur_ttvs_cum = ecdf(df_ttvs.tduravg./df_ttvs.tdur_circ)
+	plot!(plt_ttvs,x_plt, ntdur_ttvs_cum.(x_plt), label="TTVs")
+	#title!("Grouped by Multiplicity")
+	xlims!(0,2)
+end
+
+# ╔═╡ 9aa5c7ea-dbfb-4aab-a284-25a29e1d4258
+ad_ttvs_multi = KSampleADTest(df_ttvs.tduravg./df_ttvs.tdur_circ, df_no_ttvs.tduravg./df_no_ttvs.tdur_circ )
+
+# ╔═╡ a79e4e73-bb57-4086-836b-c00c27935c2f
+df_pl.TTVflag[findall(20 .<=df_pl.TTVflag.<100)]
 
 # ╔═╡ fe9ab16c-0eef-4061-b31f-281e74647174
 begin
@@ -637,9 +764,9 @@ ad_lifetime = KSampleADTest(df_pl_cooler_lifetime.tduravg./df_pl_cooler_lifetime
 
 # ╔═╡ 6deb2237-5e6d-4dac-bcca-c5193f5a4c61
 begin
-	median_rpl = median(df_pl.radius)
-	df_pl_small_rp = df_pl |> @filter(_.radius<=median_rpl) |> DataFrame;
-	df_pl_large_rp = df_pl |> @filter(_.radius> median_rpl) |> DataFrame;
+	median_rpl = median(df_pl_subN_minP.radius)
+	df_pl_small_rp = df_pl_subN_minP |> @filter(_.radius<=median_rpl) |> DataFrame;
+	df_pl_large_rp = df_pl_subN_minP |> @filter(_.radius> median_rpl) |> DataFrame;
 end;
 
 # ╔═╡ 69d8355b-ad3f-4ecb-9710-17b5846d6d1b
@@ -651,7 +778,7 @@ if make_plots
 	plot!(plt_rp,(x_plt), ntdur_smallrp_cum.(x_plt), label="Small R_p")
 	ntdur_largerp_cum = ecdf(df_pl_large_rp.tduravg./df_pl_large_rp.tdur_circ)
 	plot!(plt_rp,(x_plt), ntdur_largerp_cum.(x_plt), label="Large R_p")
-	title!(plt_rp,"Grouped by Planet Size (median = $(round(median_rpl,digits=2))R_⊕)")
+	title!(plt_rp,"Sub-Neptunes grouped by size (median = $(round(median_rpl,digits=2))R_⊕)")
 	xlims!(plt_rp,0.0,2.0)
 end
 
@@ -666,15 +793,15 @@ ad_Rp = KSampleADTest(df_pl_large_rp.tduravg./df_pl_large_rp.tdur_circ, df_pl_sm
 
 # ╔═╡ f8a18459-2375-41e2-bc03-43662b42f6a6
 begin
-	median_P = median(df_pl.TTVperiod)
+	median_P = median(df_pl_subN_minP.TTVperiod)
 	split_P = median_P # 10
-	df_pl_small_P = df_pl |> @filter(_.TTVperiod<=split_P) |> DataFrame;
-	df_pl_large_P = df_pl |> @filter(_.TTVperiod> split_P) |> DataFrame;
+	df_pl_small_P = df_pl_subN_minP |> @filter(_.TTVperiod<=split_P) |> DataFrame;
+	df_pl_large_P = df_pl_subN_minP |> @filter(_.TTVperiod> split_P) |> DataFrame;
 end;
 
 # ╔═╡ d25b4d73-fe48-4958-937b-8d06bb71852b
 if make_plots
-	plt_P = plot(xlabel="τ", ylabel="Cumulative", legend=:topleft)
+	plt_P = plot(xlabel="Normalized Transit Duration", ylabel="Cumulative", legend=:topleft)
 	plot!(plt_P,(x_plt),ntdur_all_cum.(x_plt), label="All") 
 	
 	ntdur_smallP_cum = ecdf(df_pl_small_P.tduravg./df_pl_small_P.tdur_circ)
@@ -682,7 +809,7 @@ if make_plots
 	ntdur_largeP_cum = ecdf(df_pl_large_P.tduravg./df_pl_large_P.tdur_circ)
 	plot!(plt_P,(x_plt), ntdur_largeP_cum.(x_plt), label="P>$(round(split_P*10)/10) d")
 	xlims!(plt_P,0.0,2.0)
-	#title!(plt_P,@sprintf("Grouped by Period (median=%2.2f)",median_P))
+	title!(plt_P,@sprintf("Sub-Neptunes grouped by Period (median=%2.2f)",median_P))
 end
 
 # ╔═╡ 37fdce37-1188-4f67-bf18-8041b73e023c
@@ -1843,43 +1970,51 @@ version = "0.9.1+5"
 # ╟─88d46a9d-adda-4750-87e8-58c1b50176cd
 # ╟─cb9f36fe-8bae-4e54-ae9c-d2fdc466c425
 # ╟─69f7e8be-3541-4fa7-b74b-7ebfc4a0fefc
-# ╟─92ef31db-67ae-4d4c-8c91-69734ee64d7a
-# ╟─eadfde5c-9124-4c9f-87b6-a5c79d50d772
-# ╟─dc9d19bc-cdcb-4a19-bbda-71203b0832a3
+# ╠═92ef31db-67ae-4d4c-8c91-69734ee64d7a
+# ╠═eadfde5c-9124-4c9f-87b6-a5c79d50d772
 # ╟─f8fa6349-04be-4f6c-9465-85208dfc198d
 # ╟─05572fad-3d61-4a99-8511-6915b0cda15a
 # ╟─3d97e21f-9785-46d8-aa61-87a69fda8b19
 # ╟─08aeb059-fe92-455d-a726-577329d68be7
 # ╟─d80424df-bcfa-4bf1-805e-954fd4c9c25c
 # ╟─77de3d40-428f-463e-88a7-3eb209b52747
-# ╟─4c77a70d-c003-48eb-a683-359446950878
+# ╠═4c77a70d-c003-48eb-a683-359446950878
+# ╟─e2935390-9f3b-4313-b264-ef3ffe6a1909
 # ╟─1e682cd4-2ac0-43d2-98df-a054520fd5c5
 # ╟─33d289e5-a205-4a82-a0e6-0b09d50a1f1f
 # ╟─8dc05082-c2bd-4120-b7f0-499287953056
 # ╟─4276feec-2e6f-4a89-89be-7a152a3833dc
 # ╟─dac4d650-c8b7-4a24-8420-a0ebc56dccca
-# ╟─da90b894-32da-4187-b1a1-6548bf5b5b12
 # ╟─561c5fee-e103-4de8-ab47-e11f32a2a9d0
 # ╟─56effba4-4537-4f1b-8225-9683668ca37a
+# ╠═88003636-9962-4f69-ba79-72a301ec1cc1
 # ╟─b5d1da7a-c483-42f7-9b64-e31bedf768ba
 # ╟─d3b2e526-8838-460c-ad02-a6bde5c5ef4f
-# ╠═7fe5f5af-2085-49ab-9a6c-990548ccb5f3
 # ╟─5af5ef4f-a8a4-48b8-8111-c30765cf0ac0
 # ╟─ab590e37-4c5b-4609-876a-c09ee92985c8
 # ╟─a6074ab0-eacd-427b-971a-20ee9af02abb
 # ╟─a6ec4534-fada-4210-a780-2e124c4b4595
 # ╟─92c2f1dd-e4b6-4896-9ebe-1ffe3ee5f49c
+# ╟─b97f75f9-5e15-45d9-9478-9eb415223f2a
+# ╟─6da98b4f-b3cf-4af8-92df-4aa8c158be42
+# ╟─d47a6e1e-f37a-45ef-94e6-588ad7294109
+# ╟─205c669d-d233-486e-94c2-e233832e3207
+# ╟─6950f3e7-ebff-48e5-980f-14939fa50c8f
 # ╟─9f930a87-597d-4997-9819-6a41acdd53bb
 # ╟─69d8355b-ad3f-4ecb-9710-17b5846d6d1b
 # ╟─924fffcd-b1fa-455a-95d6-dbea0ebaf7d4
 # ╟─95dfd011-b505-4c94-93f8-9968e5eb6cab
+# ╠═06757582-96bb-42ed-84f0-d53f67b0bb00
+# ╟─df6285f5-9e8a-4dee-bbd3-64f1915ed5ba
+# ╟─94e3a1d3-efc5-4b15-9f53-e53caa0129f5
 # ╟─616bb0a9-f6da-458a-bc25-ad3dbcd0d77b
 # ╟─d25b4d73-fe48-4958-937b-8d06bb71852b
 # ╟─93364c3e-3538-415e-99e5-5c018753970d
 # ╠═4cf1d6c9-ff78-4056-be09-2279ccb3b54c
 # ╟─3dfa1096-7625-409c-a3a3-24f3907d4ac5
+# ╠═f3b236dd-4355-4d01-9a5a-b5166fe1df41
 # ╟─f8cc2102-eeb2-4b4c-a8d0-ec5c206a7f42
-# ╟─df6285f5-9e8a-4dee-bbd3-64f1915ed5ba
+# ╟─d088009d-f0a5-416a-9fd7-bc25e620336b
 # ╟─c859043d-d7ba-47cd-9035-319cdc200720
 # ╟─f79b9f5e-1651-429b-8f6b-d6581a77707f
 # ╟─0557efb5-6120-4c48-a9b4-3da2854d2f98
@@ -1906,17 +2041,28 @@ version = "0.9.1+5"
 # ╠═ad551ae3-e000-4259-98ea-4cad99f6b9d5
 # ╠═4741c041-f315-4e45-b4cc-638ce16bbbcc
 # ╠═adb97bb7-5a53-4583-a5fa-b4e8d521f6fb
+# ╟─7578f32b-1f5f-4b78-a846-5e68632504fb
+# ╠═b4ed3a71-8b6f-474b-9d6e-b9f48c24c6c9
+# ╠═87288452-cb57-4459-a6e0-bcd1656292c8
+# ╠═289c5efb-a74d-4d8b-9a73-84541768a841
+# ╠═3e5f8730-08e0-4c9b-958d-71304e2f62f7
+# ╠═527d4978-7292-497b-bdb6-8591e4546f1a
+# ╠═0d820b6d-65fd-431e-a4da-4d708630a06f
+# ╠═ab0abdfb-13f7-4126-8c1c-f0b36182a89e
+# ╠═bbffeaa4-6b1b-4ae3-85bc-ee8b6a47e000
+# ╠═9aa5c7ea-dbfb-4aab-a284-25a29e1d4258
 # ╟─639dfbeb-60e5-4f59-a3dc-81a0884f0ac4
 # ╠═c02c95b0-454d-435a-8331-ebdb50d17414
 # ╠═10e7a5ea-2980-4122-9ef1-385467ce08bb
 # ╠═bda80d86-3430-45ef-9006-d6b77b1758d8
+# ╠═4d81732f-f21f-4a47-8678-b1b5e01e378e
 # ╟─ae6f7834-f939-4a09-9bd6-bf105c6b05c5
 # ╠═37fdce37-1188-4f67-bf18-8041b73e023c
 # ╠═7900c30c-200f-4a57-82d6-3261f56017e3
 # ╠═c3555ff6-f87f-4cc7-ba11-519496969e33
 # ╠═3013ec6b-3139-4fdd-aa69-fe4b45dfd9f8
+# ╠═90eec4d8-162f-4ff9-861f-8e7482f5b8e7
 # ╟─d498d791-9763-47e5-b5cc-3a41d930dbe7
-# ╠═893a58a5-f88b-4a59-bf21-c66b7e9404d4
 # ╠═46749afb-7cdb-4956-b835-8623b7cd856a
 # ╠═bc6d7cfc-b8da-43ac-84a5-73e323323701
 # ╠═cd152b2a-1690-42d5-b76a-cd71b636aa01
@@ -1929,10 +2075,15 @@ version = "0.9.1+5"
 # ╠═49c7d182-fd27-4d51-a7d2-c2153beda6af
 # ╠═980de46b-4839-4fd7-b4fe-4ebe1b19bf43
 # ╟─2704c820-d307-4acc-869a-e8670232ec38
+# ╠═f4c7e3a9-2e26-4da7-9e09-864fe9c26523
 # ╠═35d1e842-496b-11ec-2e35-17c2d536f22f
 # ╠═cc668221-1b44-4fcb-83bf-d7f851c8bcbd
 # ╟─585c1c7a-56bd-49b7-b075-b2232072c893
 # ╠═3a0a2bd4-32f4-47d7-a34d-b22880c91395
+# ╠═c175d516-2f7f-468f-988f-3446c234d6ce
+# ╠═3d095839-c07d-4e99-8004-e599fe08ecda
+# ╠═e1cdb2a2-48e2-4cfc-8271-ce564db8dec3
+# ╠═5248a65a-6b3d-4f39-805b-e8d08824c363
 # ╠═98e17af2-f0b4-4a2a-a9ba-2040da85af88
 # ╠═e4581234-6052-4ec4-b6d1-94d3c3c10a28
 # ╠═cc173a8d-09a4-4ff0-a695-6eba16ade3b1
@@ -1941,17 +2092,13 @@ version = "0.9.1+5"
 # ╠═1a7dc30e-a793-435c-9c79-c96ad455bb11
 # ╠═74fd8933-74f4-4364-a2f8-1465740987b9
 # ╟─591cebe7-9aa4-4617-9aee-c10c038a7002
-# ╠═0ac069bb-3e86-4648-964e-69c640538187
-# ╠═ed49e14f-4b9c-42d2-8e55-2b3091fe4c14
-# ╠═9179cdfd-1f7a-476f-a535-bae6a2fc192f
-# ╠═b3447847-e7f2-4844-be44-01669a0f0e74
-# ╠═8f46b232-4978-4ea5-bade-d8446e37b8ff
-# ╠═2f44dc3d-00f9-4fb9-b4af-e15eead627c2
 # ╠═52ca81e0-fa57-4957-a91d-4b6919c3366e
-# ╠═0c3d9129-c9be-4dc4-a1a0-1b8ec39ba16c
 # ╠═5d9c5e6e-d42e-4bf0-99a0-fc89612c15d8
 # ╟─9dbf4174-17c6-421f-ba9e-953221fcd58f
 # ╠═b97166df-bf9a-4208-ac69-6475e6e1cdfa
+# ╠═caa510c4-45e4-4a47-bc07-554c4c596e53
+# ╠═585b5544-b088-4b8d-aa7f-6da2157fead5
+# ╠═a79e4e73-bb57-4086-836b-c00c27935c2f
 # ╠═fe9ab16c-0eef-4061-b31f-281e74647174
 # ╠═7c75fdc7-2cbe-4f83-8d89-25cb3d328d11
 # ╠═6deb2237-5e6d-4dac-bcca-c5193f5a4c61
